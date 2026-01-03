@@ -21,7 +21,7 @@ PLATFORMS = [
 ]
 
 # Global values
-DOMAIN = "GuntamaticBiostar"
+DOMAIN = "guntamatic_biostar"
 MANUFACTURER = "Guntamatic"
 MODEL = "Biostar"
 DATA_SCHEMA_HOST = "host"
