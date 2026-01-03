@@ -1,0 +1,21 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Ta integracija je že konfigurirana.",
+            "cannot_connect": "Ni mogoče vzpostaviti povezave z Guntamatic Biostar. Preverite IP naslov in API ključ."
+        },
+        "error": {
+            "cannot_connect": "Povezava ni uspela"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "host": "IP naslov",
+                    "api_key": "API ključ (zagotovil Guntamatic)"
+                },
+                "description": "Nastavite integracijo Guntamatic Biostar.",
+                "title": "Integracija Guntamatic Biostar za Home Assistant prek API-ja"
+            }
+        }
+    }
+}

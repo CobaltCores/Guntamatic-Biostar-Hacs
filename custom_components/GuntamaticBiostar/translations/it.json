@@ -1,0 +1,21 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Questa integrazione è già configurata.",
+            "cannot_connect": "Impossibile connettersi al Guntamatic Biostar. Verificare l'indirizzo IP e la chiave API."
+        },
+        "error": {
+            "cannot_connect": "Connessione fallita"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "host": "Indirizzo IP",
+                    "api_key": "Chiave API (fornita da Guntamatic)"
+                },
+                "description": "Configura l'integrazione Guntamatic Biostar.",
+                "title": "Integrazione Guntamatic Biostar per Home Assistant via API"
+            }
+        }
+    }
+}

@@ -1,0 +1,21 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Tato integrace je již nakonfigurována.",
+            "cannot_connect": "Nelze se připojit ke Guntamatic Biostar. Zkontrolujte IP adresu a API klíč."
+        },
+        "error": {
+            "cannot_connect": "Připojení selhalo"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "host": "IP adresa",
+                    "api_key": "API klíč (poskytnutý společností Guntamatic)"
+                },
+                "description": "Nastavte integraci Guntamatic Biostar.",
+                "title": "Integrace Guntamatic Biostar pro Home Assistant přes API"
+            }
+        }
+    }
+}

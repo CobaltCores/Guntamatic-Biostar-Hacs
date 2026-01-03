@@ -1,0 +1,21 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Ez az integráció már konfigurálva van.",
+            "cannot_connect": "Nem sikerült csatlakozni a Guntamatic Biostarhoz. Ellenőrizze az IP-címet és az API-kulcsot."
+        },
+        "error": {
+            "cannot_connect": "A kapcsolat sikertelen"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "host": "IP-cím",
+                    "api_key": "API-kulcs (a Guntamatic által biztosított)"
+                },
+                "description": "Állítsa be a Guntamatic Biostar integrációt.",
+                "title": "Guntamatic Biostar integráció a Home Assistant számára API-n keresztül"
+            }
+        }
+    }
+}
