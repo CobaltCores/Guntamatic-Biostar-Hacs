@@ -7,12 +7,18 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.device_registry import DeviceInfo
 
 from . import BiostarUpdateCoordinator
-from .const import DOMAIN, MANUFACTURER, PROGRAM_OPTIONS, PROGRAM_OPTIONS_REVERSE
+from .const import (
+    DOMAIN,
+    PROGRAM_OPTIONS,
+    is_program_state_key,
+    normalize_program_option,
+)
+from .entity_helpers import config_entry_unique_id, device_info_for_entry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,29 +49,17 @@ class GuntamaticProgramSelect(CoordinatorEntity, SelectEntity):
     def __init__(self, coordinator: BiostarUpdateCoordinator) -> None:
         """Initialize the select entity."""
         super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.config_entry.unique_id}_program"
+        self._attr_unique_id = (
+            f"{config_entry_unique_id(coordinator.config_entry)}_program"
+        )
         self._attr_options = list(PROGRAM_OPTIONS.keys())
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
-        api_device_info = self.coordinator.get_device_info()
-        model = "Biostar"
-        sw_version = None
-        serial = None
-
-        if api_device_info:
-            model = api_device_info.get("typ", "Biostar")
-            sw_version = api_device_info.get("sw_version")
-            serial = api_device_info.get("sn")
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.config_entry.unique_id)},
-            name=f"Guntamatic {model}",
-            manufacturer=MANUFACTURER,
-            model=model,
-            sw_version=sw_version,
-            serial_number=serial,
+        return device_info_for_entry(
+            self.coordinator.config_entry,
+            self.coordinator.get_device_info(),
         )
 
     @property
@@ -74,17 +68,13 @@ class GuntamaticProgramSelect(CoordinatorEntity, SelectEntity):
         # Try to get current program from coordinator data
         data = self.coordinator.data
         if data:
-            # Look for program state in various possible keys
-            for key in data:
-                if "program" in key.lower() or "prog" in key.lower():
-                    value = data[key][0] if isinstance(data[key], list) else data[key]
-                    if isinstance(value, int) and value in PROGRAM_OPTIONS_REVERSE:
-                        return PROGRAM_OPTIONS_REVERSE[value]
-                    elif isinstance(value, str):
-                        value_lower = value.lower()
-                        for option in PROGRAM_OPTIONS.keys():
-                            if option in value_lower:
-                                return option
+            for key, raw_value in data.items():
+                if not is_program_state_key(key):
+                    continue
+
+                value = raw_value[0] if isinstance(raw_value, list) else raw_value
+                if option := normalize_program_option(value):
+                    return option
         # Default to None if no state found (shows as Unknown in UI)
         return None
 

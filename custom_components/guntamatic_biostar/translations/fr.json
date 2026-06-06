@@ -19,6 +19,17 @@
             }
         }
     },
+    "options": {
+        "step": {
+            "init": {
+                "data": {
+                    "include_legacy_sensors": "Inclure les capteurs legacy"
+                },
+                "description": "Quand cette option est active, Home Assistant interroge aussi les anciens endpoints pour exposer plus de capteurs. Désactivez-la si l'endpoint moderne status fournit déjà toutes les données utiles.",
+                "title": "Options Guntamatic Biostar"
+            }
+        }
+    },
     "entity": {
         "select": {
             "heating_program": {

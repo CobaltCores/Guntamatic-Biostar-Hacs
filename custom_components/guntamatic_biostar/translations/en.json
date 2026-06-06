@@ -19,6 +19,17 @@
             }
         }
     },
+    "options": {
+        "step": {
+            "init": {
+                "data": {
+                    "include_legacy_sensors": "Include legacy sensors"
+                },
+                "description": "When enabled, Home Assistant also queries the legacy endpoints to expose additional sensors. Disable it if the modern status endpoint already provides everything you need.",
+                "title": "Guntamatic Biostar options"
+            }
+        }
+    },
     "entity": {
         "select": {
             "heating_program": {

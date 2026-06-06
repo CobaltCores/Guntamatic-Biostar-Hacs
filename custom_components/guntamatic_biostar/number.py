@@ -8,12 +8,13 @@ from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.device_registry import DeviceInfo
 
 from . import BiostarUpdateCoordinator
-from .const import DOMAIN, MANUFACTURER
+from .const import DOMAIN
+from .entity_helpers import config_entry_unique_id, device_info_for_entry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,9 +100,7 @@ class GuntamaticTempNumber(CoordinatorEntity, NumberEntity):
         self._attr_translation_key = f"{temp_type}_temperature"
 
         # Unique ID
-        self._attr_unique_id = (
-            f"{coordinator.config_entry.unique_id}_{circuit_nr}_{temp_type}_temp"
-        )
+        self._attr_unique_id = f"{config_entry_unique_id(coordinator.config_entry)}_{circuit_nr}_{temp_type}_temp"
 
         # Temperature constraints from API
         self._attr_native_min_value = constraints.get("min", 15.0)
@@ -111,23 +110,9 @@ class GuntamaticTempNumber(CoordinatorEntity, NumberEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
-        api_device_info = self.coordinator.get_device_info()
-        model = "Biostar"
-        sw_version = None
-        serial = None
-
-        if api_device_info:
-            model = api_device_info.get("typ", "Biostar")
-            sw_version = api_device_info.get("sw_version")
-            serial = api_device_info.get("sn")
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.config_entry.unique_id)},
-            name=f"Guntamatic {model}",
-            manufacturer=MANUFACTURER,
-            model=model,
-            sw_version=sw_version,
-            serial_number=serial,
+        return device_info_for_entry(
+            self.coordinator.config_entry,
+            self.coordinator.get_device_info(),
         )
 
     @property

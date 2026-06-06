@@ -9,15 +9,19 @@ from aiohttp import ClientSession
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    CONF_INCLUDE_LEGACY,
     DATA_SCHEMA_API_KEY,
     DATA_SCHEMA_HOST,
     DATA_SCHEMA_WRITE_KEY,
+    DEFAULT_INCLUDE_LEGACY,
     DOMAIN,
     PLATFORMS,
 )
+from .entity_helpers import migrated_dynamic_entity_unique_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,18 +32,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api_key = entry.data[DATA_SCHEMA_API_KEY]
     host = entry.data[DATA_SCHEMA_HOST]
     write_key = entry.data.get(DATA_SCHEMA_WRITE_KEY)
+    include_legacy = entry.options.get(CONF_INCLUDE_LEGACY, DEFAULT_INCLUDE_LEGACY)
     coordinator = BiostarUpdateCoordinator(
         hass=hass,
         session=websession,
         api_key=api_key,
         host=host,
         write_key=write_key,
+        include_legacy=include_legacy,
         config_entry=entry,
     )
 
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.async_on_unload(entry.add_update_listener(async_update_options))
 
     # Trigger the creation of sensors
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -55,6 +62,48 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
+async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the integration when options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old config entries."""
+    if entry.version > 2:
+        return False
+
+    if entry.version == 1:
+        entity_registry = er.async_get(hass)
+
+        for registry_entry in er.async_entries_for_config_entry(
+            entity_registry, entry.entry_id
+        ):
+            if registry_entry.domain not in {"sensor", "binary_sensor"}:
+                continue
+
+            new_unique_id = migrated_dynamic_entity_unique_id(
+                entry, registry_entry.unique_id
+            )
+            if not new_unique_id or new_unique_id == registry_entry.unique_id:
+                continue
+
+            try:
+                entity_registry.async_update_entity(
+                    registry_entry.entity_id,
+                    new_unique_id=new_unique_id,
+                )
+            except ValueError as err:
+                _LOGGER.warning(
+                    "Could not migrate unique ID for %s: %s",
+                    registry_entry.entity_id,
+                    err,
+                )
+
+        hass.config_entries.async_update_entry(entry, version=2)
+
+    return True
+
+
 class Biostar:
     """API client for Guntamatic Biostar."""
 
@@ -64,11 +113,13 @@ class Biostar:
         host: str,
         session: ClientSession,
         write_key: str | None = None,
+        include_legacy: bool = DEFAULT_INCLUDE_LEGACY,
     ):
         self._api_key = api_key
         self._host = host
         self._session = session
         self._write_key = write_key
+        self._include_legacy = include_legacy
         self._device_info = None
         self._heating_circuits = []
         self._heat_constraints = {"min": 15.0, "max": 30.0, "inc": 0.5}
@@ -83,6 +134,9 @@ class Biostar:
             ) as resp:
                 if resp.status == 200:
                     data = await resp.json(content_type=None)
+                    if not isinstance(data, dict):
+                        _LOGGER.debug("status.cgi returned non-object JSON")
+                        return None
                     _LOGGER.debug("Successfully retrieved status.cgi data")
                     return data
                 else:
@@ -98,63 +152,68 @@ class Biostar:
         params = {"key": self._api_key}
 
         legacy_endpoints = ["/daqdesc.cgi", "/daqdata.cgi"]
-        dataDescription = None
-        dataValues = None
+        data_description = None
+        data_values = None
 
-        for API in legacy_endpoints:
+        for api_path in legacy_endpoints:
             try:
                 async with self._session.get(
-                    f"http://{self._host}{API}", params=params
+                    f"http://{self._host}{api_path}", params=params
                 ) as resp:
                     if resp.status != 200:
-                        _LOGGER.error(f"Legacy API {API} returned {resp.status}")
-                        raise UpdateFailed(f"Legacy API {API} returned {resp.status}")
+                        _LOGGER.error(
+                            "Legacy API %s returned %s", api_path, resp.status
+                        )
+                        raise UpdateFailed(
+                            f"Legacy API {api_path} returned {resp.status}"
+                        )
 
-                    if API == legacy_endpoints[0]:
-                        dataDescription = await resp.text(encoding="windows-1252")
-                        dataDescription = dataDescription.split("\n")[0:-1]
-                    elif API == legacy_endpoints[1]:
-                        dataValues = await resp.text(encoding="windows-1252")
-                        dataValues = dataValues.split("\n")[0:-1]
+                    if api_path == legacy_endpoints[0]:
+                        data_description = await resp.text(encoding="windows-1252")
+                        data_description = data_description.splitlines()
+                    elif api_path == legacy_endpoints[1]:
+                        data_values = await resp.text(encoding="windows-1252")
+                        data_values = data_values.splitlines()
             except UpdateFailed:
                 raise
             except Exception as e:
-                _LOGGER.error(f"Error fetching from legacy API {API}: {e}")
+                _LOGGER.error("Error fetching from legacy API %s: %s", api_path, e)
                 raise UpdateFailed(f"Failed to fetch from legacy API: {e}")
 
         # Parse legacy API data
-        if dataDescription and dataValues:
-            for i in range(min(len(dataDescription), len(dataValues))):
+        if data_description and data_values:
+            for i in range(min(len(data_description), len(data_values))):
                 try:
-                    key, unitOfMeasurement = dataDescription[i].split(";")
+                    key, unit_of_measurement = data_description[i].split(";")
                 except ValueError:
                     continue
 
                 if key.lower() in ["reserved", "réservé", "reserviert"]:
                     continue
 
-                unitOfMeasurement = unitOfMeasurement.strip() or None
-                raw_value = dataValues[i].strip()
+                unit_of_measurement = unit_of_measurement.strip() or None
+                raw_value = data_values[i].strip()
+                raw_value_upper = raw_value.upper()
 
                 # Parse value based on type
-                if raw_value in ["AN", "ON", "MARCHE"]:
-                    dataValue = True
-                elif raw_value in ["AUS", "OFF", "ARRÊT"]:
-                    dataValue = False
-                elif unitOfMeasurement in ["°C", "%"]:
+                if raw_value_upper in ["AN", "ON", "MARCHE", "EIN"]:
+                    data_value = True
+                elif raw_value_upper in ["AUS", "OFF", "ARRÊT", "ARRET"]:
+                    data_value = False
+                elif unit_of_measurement in ["°C", "%"]:
                     try:
-                        dataValue = float(raw_value)
+                        data_value = float(raw_value)
                     except ValueError:
-                        dataValue = raw_value
-                elif unitOfMeasurement in ["d", "h"]:
+                        data_value = raw_value
+                elif unit_of_measurement in ["d", "h"]:
                     try:
-                        dataValue = int(float(raw_value))
+                        data_value = int(float(raw_value))
                     except ValueError:
-                        dataValue = raw_value
+                        data_value = raw_value
                 else:
-                    dataValue = raw_value
+                    data_value = raw_value
 
-                data[key] = [dataValue, unitOfMeasurement]
+                data[key] = [data_value, unit_of_measurement]
 
         return data
 
@@ -184,21 +243,22 @@ class Biostar:
             # Convert status.cgi data to our format
             result = self._parse_status_data(status_data)
 
-        # Step 2: Get legacy data (always, for additional sensors)
-        try:
-            legacy_data = await self._async_get_legacy_data()
+        # Step 2: Get legacy data when enabled, or as a fallback if JSON failed.
+        if self._include_legacy or not result:
+            try:
+                legacy_data = await self._async_get_legacy_data()
 
-            # Merge legacy data (don't overwrite existing keys from status.cgi)
-            for key, value in legacy_data.items():
-                if key not in result:
-                    result[key] = value
+                # Merge legacy data (don't overwrite existing keys from status.cgi)
+                for key, value in legacy_data.items():
+                    if key not in result:
+                        result[key] = value
 
-        except UpdateFailed:
-            if not result:
-                raise
-            _LOGGER.warning("Legacy API failed but status.cgi data available")
+            except UpdateFailed:
+                if not result:
+                    raise
+                _LOGGER.warning("Legacy API failed but status.cgi data available")
 
-        _LOGGER.info(f"Biostar: Retrieved {len(result)} sensors")
+        _LOGGER.debug("Biostar: Retrieved %s sensors", len(result))
         _LOGGER.debug(f"Biostar data keys: {list(result.keys())}")
 
         return result
@@ -394,6 +454,7 @@ class BiostarUpdateCoordinator(DataUpdateCoordinator):
         api_key: str,
         host: str,
         write_key: str | None = None,
+        include_legacy: bool = DEFAULT_INCLUDE_LEGACY,
         config_entry: ConfigEntry = None,
     ) -> None:
         """Initialize the coordinator."""
@@ -404,7 +465,11 @@ class BiostarUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(minutes=1),
         )
         self.my_api = Biostar(
-            api_key=api_key, session=session, host=host, write_key=write_key
+            api_key=api_key,
+            session=session,
+            host=host,
+            write_key=write_key,
+            include_legacy=include_legacy,
         )
         self.config_entry = config_entry
 

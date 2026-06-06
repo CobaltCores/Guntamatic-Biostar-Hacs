@@ -18,6 +18,8 @@ This custom component communicates directly with your boiler's local API to retr
   - Device Info (Serial Number, Firmware Version)
 - **⚡ Fast Updates**: Polls data every minute.
 - **🔧 Easy Config**: Fully configurable via the Home Assistant UI.
+- **🧩 Safe Entity IDs**: Dynamic entities are scoped per configured boiler, with migration for older installs.
+- **⚙️ Legacy Endpoint Option**: Legacy sensor enrichment can be disabled from the integration options.
 
 ## 📦 Installation
 
@@ -43,6 +45,11 @@ This custom component communicates directly with your boiler's local API to retr
 4. Enter your boiler's details:
    - **Host**: IP address of the boiler (e.g., `192.168.1.165`)
    - **API Key**: Your Guntamatic API key (usually found on the boiler's sticker or in the menu)
+   - **Write Key**: Optional, only required for changing heating programs or temperatures.
+
+### Options
+
+Open the integration options from **Settings** > **Devices & Services** to choose whether Home Assistant should also query the legacy endpoints for extra sensors. This is enabled by default to preserve existing behavior.
 
 ## 🔍 How it works
 
