@@ -3,7 +3,6 @@
 import logging
 from datetime import timedelta
 from typing import Any
-import json
 
 import async_timeout
 from aiohttp import ClientSession
@@ -51,6 +50,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
     return unload_ok
 
 
@@ -81,7 +82,7 @@ class Biostar:
                 f"http://{self._host}/status.cgi", params=params
             ) as resp:
                 if resp.status == 200:
-                    data = await resp.json()
+                    data = await resp.json(content_type=None)
                     _LOGGER.debug("Successfully retrieved status.cgi data")
                     return data
                 else:

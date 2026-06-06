@@ -13,7 +13,6 @@ from .const import (
     DATA_SCHEMA,
     DATA_SCHEMA_HOST,
     DATA_SCHEMA_API_KEY,
-    DATA_SCHEMA_WRITE_KEY,
     DOMAIN,
 )
 

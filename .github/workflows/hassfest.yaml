@@ -1,9 +1,9 @@
+---
 name: Validate with hassfest
 
-on:
+"on":
   push:
   pull_request:
-
 
 jobs:
   validate:

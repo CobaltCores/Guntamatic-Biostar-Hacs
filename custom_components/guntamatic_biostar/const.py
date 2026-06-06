@@ -57,7 +57,7 @@ UNIT_DEVICE_CLASS_MAP = {
         "state_class": SensorStateClass.MEASUREMENT,
     },
     "%": {
-        "device_class": SensorDeviceClass.POWER_FACTOR,
+        "device_class": None,
         "unit": PERCENTAGE,
         "state_class": SensorStateClass.MEASUREMENT,
     },

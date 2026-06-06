@@ -32,7 +32,7 @@ This custom component communicates directly with your boiler's local API to retr
 ### Option 2: Manual
 
 1. Download the latest release.
-2. Copy the `custom_components/GuntamaticBiostar` folder to your HA `custom_components` directory.
+2. Copy the `custom_components/guntamatic_biostar` folder to your HA `custom_components` directory.
 3. Restart Home Assistant.
 
 ## ⚙️ Configuration
