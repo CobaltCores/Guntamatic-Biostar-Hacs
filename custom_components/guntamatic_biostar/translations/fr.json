@@ -225,9 +225,6 @@
             "ash_empty_in": {
                 "name": "Vidage cendrier dans"
             },
-            "cleaning_countdown": {
-                "name": "Nettoyage dans"
-            },
             "serial": {
                 "name": "Numéro de série"
             },

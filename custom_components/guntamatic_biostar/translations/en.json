@@ -225,9 +225,6 @@
             "ash_empty_in": {
                 "name": "Ash emptying in"
             },
-            "cleaning_countdown": {
-                "name": "Cleaning in"
-            },
             "serial": {
                 "name": "Serial number"
             },

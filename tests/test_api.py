@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from urllib.parse import parse_qs
 
 import pytest
@@ -84,7 +85,7 @@ async def test_get_data_merges_without_duplicates(hass: HomeAssistant, boiler):
     # status.cgi only values.
     assert data.values["flue_gas"] == (59.0, "%")
     assert data.values["fuel_level"] == (80.0, "%")
-    assert data.values["cleaning_countdown"] == (49.0, "h")
+    assert data.values["ash_empty_in"] == (49.0, "h")
     assert data.values["version"] == ("32a", None)
     assert data.meta["typ"] == "Biostar 15"
     circuit = data.circuits[1]
@@ -225,3 +226,55 @@ def test_library_warnings_are_not_repeated(caplog):
     parse_legacy(descriptions, values)
     parse_legacy(descriptions, values)
     assert caplog.text.count("Untranslated string detected for INCONNU") == 1
+
+
+async def test_real_biostar_fw33_capture(hass: HomeAssistant, aioclient_mock):
+    """Capture of a Biostar 15 kW, firmware 3.3c, French UI (serials changed).
+
+    One heating circuit (CH0, status.cgi nr "0"), no buffer tank, no hot
+    water circuit.
+    """
+    fixtures = Path(__file__).parent / "fixtures"
+    aioclient_mock.get(
+        f"{BASE}/status.cgi",
+        content=(fixtures / "fw33_fr_status.json").read_bytes(),
+    )
+    aioclient_mock.get(
+        f"{BASE}/daqdesc.cgi", content=(fixtures / "fw33_fr_daqdesc.txt").read_bytes()
+    )
+    aioclient_mock.get(
+        f"{BASE}/daqdata.cgi", content=(fixtures / "fw33_fr_daqdata.txt").read_bytes()
+    )
+    data = await _client(hass).async_get_data()
+
+    assert set(data.circuits) == {0}
+    assert data.circuits[0].numbered
+    assert data.circuits[0].name == "Radiateurs"
+    assert data.constraints["min"] == 15.0
+    # status.cgi enum wins over the localized state of the legacy line.
+    assert data.values["heating_circulation_program_0"] == ("timer", None)
+    assert data.values["program"] == ("timer", None)
+    assert data.values["room_0_temperature"] == (20.16, "°C")
+    assert data.values["heating_circulation_pump_0"] == ("on", None)
+    assert data.values["boiler_temperature"] == (42.64, "°C")
+    # status.cgi fractions become percentages.
+    assert data.values["flue_gas"] == (32.0, "%")
+    assert data.values["fuel_level"] == (0.0, "%")
+    # Missing probes (120 / -100 / -20 °C) and their companions are gone.
+    for key in (
+        "buffer_top_temperature",
+        "buffer_center_temperature",
+        "buffer_bottom_temperature",
+        "buffer_t5_temperature",
+        "buffer_t6_temperature",
+        "buffer_t7_temperature",
+        "buffer_load",
+        "domestic_hot_water_0_temperature",
+        "dhw_pump_0",
+        "extra_dhw_0_temperature",
+        "room_1_temperature",
+        "circuit_1_temp",
+    ):
+        assert key not in data.values, key
+    assert data.extras == {}
+    assert data.errors == []
