@@ -246,6 +246,25 @@ async def test_migration_prefers_enabled_duplicate(hass: HomeAssistant, boiler):
     assert hass.states.get(status).state == "65.0"
 
 
+async def test_migration_fault_lines_numbered_from_zero(hass: HomeAssistant, boiler):
+    """Firmware 3.x "Defaut 0" / "Defaut 1" sensors get two different keys."""
+    entry = _entry(version=2)
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    first = registry.async_get_or_create(
+        "sensor", DOMAIN, f"{SERIAL}_defaut_0", config_entry=entry
+    ).entity_id
+    second = registry.async_get_or_create(
+        "sensor", DOMAIN, f"{SERIAL}_defaut_1", config_entry=entry
+    ).entity_id
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert registry.async_get(first).unique_id == f"{SERIAL}_interruption_1"
+    assert registry.async_get(second).unique_id == f"{SERIAL}_interruption_2"
+
+
 async def test_circuit_without_number_gets_no_controls(
     hass: HomeAssistant, aioclient_mock
 ):

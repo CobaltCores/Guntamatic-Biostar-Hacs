@@ -242,6 +242,25 @@ class _OfflineHeater(Heater):
         return {key: list(value) for key, value in self._raw.items()}
 
 
+def _zero_based_fault_lines(raw: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Return {interruption_N: entry} for fault lines numbered from 0.
+
+    Firmware 3.x reports "Defaut 0", "Defaut 1" where older firmware reported
+    "Defaut 1", "Defaut 2". The guntamatic library maps both "Defaut 0" and
+    "Defaut 1" to interruption_1, so the second fault line was lost.
+    """
+    lines: dict[str, list[str]] = {}
+    for label in raw:
+        if not label.endswith(" 0") or TRANSLATE.get(label) != "interruption_1":
+            continue
+        base = label.removesuffix("0")
+        nr = 0
+        while (entry := raw.get(f"{base}{nr}")) is not None:
+            lines[f"interruption_{nr + 1}"] = list(entry)
+            nr += 1
+    return lines
+
+
 def parse_legacy(
     descriptions: list[str], values: list[str]
 ) -> tuple[dict[str, Value], dict[str, Value]]:
@@ -272,6 +291,7 @@ def parse_legacy(
         _PARSER_FAILED.set()
         log("guntamatic library could not parse the legacy data")
         parsed = {}
+    parsed.update(_zero_based_fault_lines(raw))
 
     stable: dict[str, Value] = {}
     for key, (value, unit) in parsed.items():
