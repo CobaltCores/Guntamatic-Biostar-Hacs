@@ -10,7 +10,7 @@ Integration for **Guntamatic Biostar** biomass boilers in Home Assistant, talkin
 ## ✨ Features
 
 - **Stable entities in every boiler language**: values are identified by fixed English keys, so changing the boiler language or a firmware update that renames labels (as 3.3 did) keeps your entities and history. The legacy endpoints are parsed with the [`guntamatic`](https://github.com/JensTimmerman/guntamatic) library, the same one the official integration uses.
-- **No ghost sensors**: unconnected heating circuits, hot water slots and buffer stages report placeholder temperatures (-20, -9, 60 °C); they are not turned into entities.
+- **No ghost sensors**: unconnected heating circuits, hot water slots and buffer stages report placeholder temperatures (-20, -9, 60 °C) and missing probes read 120 or -100 °C on firmware 3.3; none of them become entities.
 - **No duplicates**: a value reported by both `status.cgi` and the legacy endpoints is exposed once.
 - **Translated names** (English and French; other languages fall back to English for sensor names).
 - **Control** (write key needed):
@@ -56,7 +56,7 @@ Open the integration options from **Settings** > **Devices & Services** to choos
 
 | Endpoint | Used for |
 | --- | --- |
-| `/status.cgi` (JSON, API key) | device info, heating circuits and set points, program, errors, fuel, flue gas |
+| `/status.cgi` (JSON, API key; firmware 3.3c answers without it) | device info, heating circuits and set points, program, errors, fuel, flue gas |
 | `/daqdesc.cgi` + `/daqdata.cgi` | most sensors, normalised by the `guntamatic` library |
 | `/ext/parset.cgi` (write key) | commands, `/parset.cgi` on firmware without `/ext/` |
 
@@ -66,10 +66,12 @@ Commands use the boiler's own parameter IDs (from its `par.cgi` parameter table)
 | --- | --- | --- |
 | `PR001` | boiler program | 0 off, 1 normal, 2 hot water, 3 heating, 4 reduced, 5 reduced until, 6 hot water boost |
 | `HKx01` | program of circuit x | 0 off, 1 normal, 2 heating, 3 reduced, 4 reduced until |
-| `HKx04` | day set point of circuit x | 5 – 30 °C, step 0.5 |
-| `HKx05` | night set point of circuit x | 5 – 30 °C, step 0.5 |
+| `HKx04` | day set point of circuit x | °C, limits and step from `status.cgi` (15 – 30, 0.5 on firmware 3.3c) |
+| `HKx05` | night set point of circuit x | same |
 
 `x` is the circuit number as shown on the boiler (0 – 8), taken from the `nr` field of `status.cgi`; circuits without an explicit `nr` get no controls. The enum order comes from a firmware 3.2 parameter table; other models may differ (openHAB uses 8 for a manual program), hence the check after each write.
+
+Tested on a Biostar 15 kW, firmware V3.3c, French interface: reading checked on the live boiler (the single heating circuit has `nr` 0, matching `HK0xx`), commands covered by automated tests only so far.
 
 Values the `guntamatic` library does not know yet are still created, under their boiler label, but disabled by default because their name depends on the boiler language. If you see one, please report it upstream so it gets a stable key.
 
