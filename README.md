@@ -56,7 +56,7 @@ Open the integration options from **Settings** > **Devices & Services** to choos
 
 | Endpoint | Used for |
 | --- | --- |
-| `/status.cgi` (JSON, API key) | device info, heating circuits and set points, program, errors, fuel, flue gas, cleaning countdown |
+| `/status.cgi` (JSON, API key) | device info, heating circuits and set points, program, errors, fuel, flue gas |
 | `/daqdesc.cgi` + `/daqdata.cgi` | most sensors, normalised by the `guntamatic` library |
 | `/ext/parset.cgi` (write key) | commands, `/parset.cgi` on firmware without `/ext/` |
 
@@ -75,9 +75,10 @@ Values the `guntamatic` library does not know yet are still created, under their
 
 ## ⬆️ Upgrading from 1.x
 
-- Sensors are migrated to the stable keys automatically: entity IDs, history, dashboards and automations keep working. This covers every legacy sensor and the main `status.cgi` values (boiler and outdoor temperature, CO₂, flue gas, fuel, cleaning countdown, state, mode, firmware, serial, last update).
+- Sensors are migrated to the stable keys automatically: entity IDs, history, dashboards and automations keep working. This covers every legacy sensor and the main `status.cgi` values (boiler and outdoor temperature, CO₂, flue gas, fuel, ash emptying countdown, state, mode, firmware, serial, last update).
 - Values that 1.x exposed twice (from `status.cgi` and from the legacy endpoints) are now exposed once. The enabled entity takes over (the legacy one if both are enabled); the other one stops updating and a warning in the log names both. Delete it once nothing uses it.
 - Not migrated, they stop updating and can be deleted: the per-circuit `status.cgi` sensors (`Circuit … - Temp jour/nuit/Mode`), `ECS … - Temp`, `Erreur N`, `Erreurs actives`, `Nom`, `Modèle`, `Langue`, sensors for unconnected slots, and, with a write key, the program sensors (the select entities show the program).
+- `status.cgi` reports CO₂, flue gas and fuel as fractions: 1.x showed `0.32 %`, they are now percentages (`32 %`). Its cleaning countdown is the same counter as the legacy ash emptying countdown and is merged into it.
 - Binary sensors created from on/off legacy values are replaced by sensors (pump states `on`/`off` or modes `auto`/`off`/`nonstop`) and by the new fault sensor.
 - **The program select sent wrong values in 1.x**: "heat" switched the boiler to hot water only and "lower" to heating. The options are now the boiler's own list (`normal` is `timer`, `lower` is `hibernate`). Update automations that set the program.
 - **1.x wrote the day/night set points to the wrong parameters** (`HK(x+1)02` / `HK(x+1)03`, the pump mode and timer program of the next circuit). If you changed set points from Home Assistant, check the pump mode and timer program of your heating circuits on the boiler.

@@ -76,6 +76,12 @@ EXTRA_RESERVED = ("reserviert",)
 TRUE_VALUES = {"AN", "ON", "MARCHE", "EIN"}
 FALSE_VALUES = {"AUS", "OFF", "ARRÊT", "ARRET"}
 PLACEHOLDER_TEMPERATURES = {-20.0, -9.0}
+# Readings of a missing sensor on firmware 3.3 (open circuit / not
+# configured): buffer and hot water probes report 120, extra buffer
+# probes -100. The guntamatic library only filters some of them.
+OPEN_SENSOR_TEMPERATURES = {120.0, -100.0, -20.0}
+# status.cgi reports these as fractions (0.32 for 32 %).
+STATUS_FRACTIONS = {"co2", "fumes", "fuel"}
 ON_OFF_KEYS = re.compile(
     r"^(heating_circulation_pump_\d+|auxiliary_pump_\d+|extra_dhw_boost_\d+"
     r"|dhw_pump_\d+|boiler_shunt_pump)$"
@@ -88,7 +94,8 @@ STATUS_FIELDS: dict[str, tuple[str, str | None]] = {
     "co2": ("co2_content", "%"),
     "fumes": ("flue_gas", "%"),
     "fuel": ("fuel_level", "%"),
-    "cleaning_in": ("cleaning_countdown", "h"),
+    # Same counter as the legacy "ash emptying in" line.
+    "cleaning_in": ("ash_empty_in", "h"),
     "state": ("status", None),
     "timestamp": ("last_update", None),
 }
@@ -279,6 +286,7 @@ def parse_legacy(
             elif upper in FALSE_VALUES:
                 value = "off"
         stable[key] = (value, unit)
+    _drop_open_sensors(stable)
 
     extras: dict[str, Value] = {}
     for label, (value, unit) in raw.items():
@@ -295,6 +303,44 @@ def parse_legacy(
     return stable, extras
 
 
+def _is_open(values: dict[str, Value], key: str) -> bool:
+    entry = values.get(key)
+    return (
+        entry is not None
+        and entry[1] == "°C"
+        and isinstance(entry[0], float)
+        and entry[0] in OPEN_SENSOR_TEMPERATURES
+    )
+
+
+def _drop_open_sensors(values: dict[str, Value]) -> None:
+    """Remove buffer and hot water probes that are not connected."""
+    buffer_keys = [
+        key
+        for key in values
+        if re.match(r"^buffer_(top|center|bottom|t\d+)(_\d+)?_temperature$", key)
+    ]
+    for key in buffer_keys:
+        if _is_open(values, key):
+            del values[key]
+    if not any(re.match(r"^buffer_.*_temperature$", key) for key in values):
+        # No buffer probe left: there is no buffer tank to report a load for.
+        values.pop("buffer_load", None)
+
+    for nr in range(3):
+        if _is_open(values, f"domestic_hot_water_{nr}_temperature"):
+            for key in (
+                f"domestic_hot_water_{nr}_temperature",
+                f"dhw_pump_{nr}",
+                f"extra_dhw_{nr}_temperature",
+                f"extra_dhw_boost_{nr}",
+            ):
+                values.pop(key, None)
+        elif _is_open(values, f"extra_dhw_{nr}_temperature"):
+            values.pop(f"extra_dhw_{nr}_temperature", None)
+            values.pop(f"extra_dhw_boost_{nr}", None)
+
+
 def _circuit_number(circuit: dict[str, Any], index: int) -> tuple[int, bool]:
     """Return (circuit number, whether the boiler stated it explicitly)."""
     try:
@@ -308,6 +354,12 @@ def parse_status(data: dict[str, Any], result: BiostarData) -> None:
     for field_name, (key, unit) in STATUS_FIELDS.items():
         if field_name in data:
             value = coerce_value(data[field_name], unit)
+            if (
+                field_name in STATUS_FRACTIONS
+                and isinstance(value, float)
+                and 0.0 <= value <= 1.0
+            ):
+                value = round(value * 100, 2)
             if value is not None:
                 result.values[key] = (value, unit)
 
@@ -441,9 +493,19 @@ class BiostarClient:
                 _LOGGER.warning("Legacy endpoints failed, using status.cgi data only")
             else:
                 stable, extras = parse_legacy(descriptions, values)
-                # The library output is normalised, prefer it over status.cgi
-                # unless it has nothing to say (e.g. an empty serial line).
+                # status.cgi gives the circuit program as an enum; on firmware
+                # 3.3 the legacy line shows a localized state instead
+                # ("Chauffage permanent" while status.cgi says "normal").
+                status_owned = {
+                    f"heating_circulation_program_{nr}"
+                    for nr, circuit in result.circuits.items()
+                    if circuit.numbered and circuit.program is not None
+                }
+                # Otherwise the library output is normalised: prefer it over
+                # status.cgi unless it has nothing to say (an empty line).
                 for key, value in stable.items():
+                    if key in status_owned:
+                        continue
                     if value[0] is None and key in result.values:
                         continue
                     result.values[key] = value

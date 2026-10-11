@@ -46,7 +46,7 @@ LEGACY_STATUS_LABELS = {
     "_CO2": "co2_content",
     "_Fumées": "flue_gas",
     "_Combustible": "fuel_level",
-    "_Nettoyage dans": "cleaning_countdown",
+    "_Nettoyage dans": "ash_empty_in",
     "_État": "status",
     "_Mode": "program",
     "_Version firmware": "version",

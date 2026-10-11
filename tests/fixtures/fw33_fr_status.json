@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "sn": "765432",
+    "sw_version": "V3.3c",
+    "typ": "Biostar 15kW",
+    "language": "fr"
+  },
+  "timestamp": "2026-10-11T15:12:11",
+  "name": "Chaudière",
+  "type": "th",
+  "mode": "normal",
+  "recording": false,
+  "temp": 43,
+  "ext_temp": 13,
+  "co2": 0.1,
+  "fumes": 0.32,
+  "cleaning_in": 150,
+  "fuel": 0.0,
+  "state": "regulation",
+  "heat_circ": [
+    {
+      "name": "Radiateurs",
+      "mode": "normal",
+      "day_temp": 20.0,
+      "night_temp": 17.0,
+      "weekprogram": {
+        "program": "a",
+        "mo": [
+          {
+            "begin": "07:00",
+            "end": "22:00"
+          }
+        ]
+      },
+      "nr": "0"
+    }
+  ],
+  "water_circ": [],
+  "error": [],
+  "heat_constraints": {
+    "min": 15.0,
+    "max": 30.0,
+    "inc": 0.5
+  },
+  "water_constraints": {
+    "min": 20,
+    "max": 100,
+    "inc": 1
+  }
+}

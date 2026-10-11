@@ -87,7 +87,6 @@ KEY_SPECS: list[tuple[str, str, dict[str, Any]]] = [
     (r"service_hours", "service_hours", DIAG),
     (r"service_days", "service_days", {"diagnostic": True, "enabled_default": False}),
     (r"ash_empty_in", "ash_empty_in", {}),
-    (r"cleaning_countdown", "cleaning_countdown", {}),
     (r"serial", "serial", DIAG),
     (r"version", "version", DIAG),
     (r"last_update", "last_update", {"diagnostic": True, "enabled_default": False}),
