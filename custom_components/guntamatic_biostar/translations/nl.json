@@ -25,18 +25,31 @@
                 "name": "Verwarmingsprogramma",
                 "state": {
                     "off": "Uit",
-                    "normal": "Normaal",
+                    "timer": "Normaal",
+                    "dhw": "Warm water",
                     "heat": "Verwarmen",
-                    "lower": "Verlaagd"
+                    "hibernate": "Verlaagd",
+                    "hibernate_to": "Verlaagd tot",
+                    "dhw_boost": "Warm water naladen"
+                }
+            },
+            "circuit_program": {
+                "name": "Programma circuit {index}",
+                "state": {
+                    "off": "Uit",
+                    "timer": "Normaal",
+                    "heat": "Verwarmen",
+                    "hibernate": "Verlaagd",
+                    "hibernate_to": "Verlaagd tot"
                 }
             }
         },
         "number": {
             "day_temperature": {
-                "name": "Dagtemperatuur"
+                "name": "Dagtemperatuur circuit {index}"
             },
             "night_temperature": {
-                "name": "Nachttemperatuur"
+                "name": "Nachttemperatuur circuit {index}"
             }
         }
     }

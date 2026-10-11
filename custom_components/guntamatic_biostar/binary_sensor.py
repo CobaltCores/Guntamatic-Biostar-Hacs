@@ -1,111 +1,117 @@
-"""The GuntamaticBiostar component - Dynamic binary sensor creation based on API response."""
+"""Binary sensors for the Guntamatic Biostar integration."""
 
 from __future__ import annotations
 
-import logging
+from typing import Any
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
-
-from . import BiostarUpdateCoordinator
-from .const import (
-    DOMAIN,
-    get_icon_for_key,
-    should_exclude_key,
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntity,
 )
-from .entity_helpers import device_info_for_entry, dynamic_entity_unique_id
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-_LOGGER = logging.getLogger(__name__)
+from .coordinator import BiostarConfigEntry, BiostarCoordinator
+from .entity import BiostarEntity
+from .sensor import extra_unique_suffix
+
+PARALLEL_UPDATES = 0
+
+NO_FAULT_TEXTS = {"", "0", "-", "--", "---"}
+
+
+def active_faults(coordinator: BiostarCoordinator) -> list[str]:
+    """Return the fault messages currently reported by the boiler.
+
+    status.cgi has a structured error list. Without it, fall back to the
+    free text fault lines of the legacy endpoints, whose "no fault" value is
+    not documented (empty on the boilers seen so far).
+    """
+    data = coordinator.data
+    if data.has_status:
+        return list(data.errors)
+    messages: list[str] = []
+    for key, (value, _unit) in sorted(data.values.items()):
+        if not key.startswith("interruption_") or value is None:
+            continue
+        text = str(value).strip()
+        if text not in NO_FAULT_TEXTS and text not in messages:
+            messages.append(text)
+    return messages
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: BiostarConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up binary sensors dynamically based on API data."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
-    known_keys: set[str] = set()
+    """Set up the fault sensor and on/off values with unknown labels."""
+    coordinator = entry.runtime_data
+    async_add_entities([BiostarFaultSensor(coordinator)])
+    known: set[str] = set()
 
     @callback
-    def async_add_new_entities() -> None:
-        """Add new binary sensors discovered from coordinator data."""
-        sensors = []
-        for key, value_data in coordinator.data.items():
-            if key in known_keys or should_exclude_key(key):
+    def _async_add_new() -> None:
+        entities = []
+        for label, (value, _unit) in coordinator.data.extras.items():
+            if label in known or not isinstance(value, bool):
                 continue
-
-            if _is_boolean(value_data):
-                known_keys.add(key)
-                sensors.append(
-                    GuntamaticDynamicBinarySensor(
-                        coordinator=coordinator,
-                        sensor_key=key,
-                    )
+            known.add(label)
+            entities.append(
+                BiostarExtraBinarySensor(
+                    coordinator,
+                    label,
+                    extra_unique_suffix(label, set(coordinator.data.values)),
                 )
+            )
+        if entities:
+            async_add_entities(entities)
 
-        if sensors:
-            _LOGGER.debug("Created %s binary sensors from API data", len(sensors))
-            async_add_entities(sensors)
-
-    async_add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(async_add_new_entities))
-
-
-def _is_boolean(value_data) -> bool:
-    """Return true if an API value should be represented as a binary sensor."""
-    if isinstance(value_data, (list, tuple)) and value_data:
-        return isinstance(value_data[0], bool)
-    return isinstance(value_data, bool)
+    _async_add_new()
+    entry.async_on_unload(coordinator.async_add_listener(_async_add_new))
 
 
-class GuntamaticDynamicBinarySensor(
-    CoordinatorEntity[BiostarUpdateCoordinator], BinarySensorEntity
-):
-    """A dynamically created binary sensor based on API data."""
+class BiostarFaultSensor(BiostarEntity, BinarySensorEntity):
+    """On while the boiler reports a fault."""
 
-    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_translation_key = "fault"
+
+    def __init__(self, coordinator: BiostarCoordinator) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, "fault")
+
+    @property
+    def is_on(self) -> bool:
+        """Return true while a fault is active."""
+        return bool(active_faults(self.coordinator))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose the fault messages."""
+        return {"messages": active_faults(self.coordinator)}
+
+
+class BiostarExtraBinarySensor(BiostarEntity, BinarySensorEntity):
+    """On/off value with a label the guntamatic library does not know."""
+
+    _attr_entity_registry_enabled_default = False
 
     def __init__(
-        self,
-        coordinator: BiostarUpdateCoordinator,
-        sensor_key: str,
+        self, coordinator: BiostarCoordinator, label: str, unique_suffix: str
     ) -> None:
-        """Initialize the binary sensor."""
-        super().__init__(coordinator)
-
-        self._sensor_key = sensor_key
-
-        # Clean the key name (remove leading underscore from status.cgi keys)
-        display_name = sensor_key.lstrip("_")
-
-        self._attr_unique_id = dynamic_entity_unique_id(
-            coordinator.config_entry,
-            sensor_key,
-        )
-
-        # Set the name
-        self._attr_name = display_name
-
-        # Set icon based on key patterns
-        self._attr_icon = get_icon_for_key(sensor_key)
+        """Initialize the sensor."""
+        super().__init__(coordinator, unique_suffix)
+        self._label = label
+        self._attr_name = label
 
     @property
     def is_on(self) -> bool | None:
-        """Return true if the binary sensor is on."""
-        sensor_data = self.coordinator.data.get(self._sensor_key)
-        if sensor_data is None:
-            return None
-        if isinstance(sensor_data, (list, tuple)) and len(sensor_data) > 0:
-            return sensor_data[0]
-        return sensor_data
+        """Return the state."""
+        entry = self.coordinator.data.extras.get(self._label)
+        return None if entry is None else entry[0]
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return the device information."""
-        return device_info_for_entry(
-            self.coordinator.config_entry,
-            self.coordinator.get_device_info(),
-        )
+    def available(self) -> bool:
+        """Unavailable when the boiler stops reporting this value."""
+        return super().available and self._label in self.coordinator.data.extras

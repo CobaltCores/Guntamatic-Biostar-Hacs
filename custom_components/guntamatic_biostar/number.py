@@ -1,145 +1,110 @@
-"""Number platform for Guntamatic Biostar temperature control."""
+"""Room set points for the Guntamatic Biostar integration (write key needed)."""
 
 from __future__ import annotations
 
-import logging
-
-from homeassistant.components.number import NumberEntity, NumberMode
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
 from homeassistant.const import UnitOfTemperature
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import BiostarUpdateCoordinator
-from .const import DOMAIN
-from .entity_helpers import config_entry_unique_id, device_info_for_entry
+from .api import DEFAULT_CONSTRAINTS
+from .coordinator import BiostarConfigEntry, BiostarCoordinator
+from .entity import BiostarEntity
 
-_LOGGER = logging.getLogger(__name__)
+PARALLEL_UPDATES = 1
+PERIODS = ("day", "night")
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    entry: BiostarConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up Guntamatic Biostar number entities."""
-    coordinator: BiostarUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-
-    # Only add number entities if write access is available
-    if not coordinator.has_write_access():
-        _LOGGER.debug("No write key configured - Skipping number entities")
+    """Set up day/night set points for every heating circuit in status.cgi."""
+    coordinator = entry.runtime_data
+    if not coordinator.client.has_write_access:
         return
+    known: set[int] = set()
 
-    # Wait for data to be available
-    if not coordinator.data:
-        await coordinator.async_refresh()
-
-    # Get heating circuits and create entities for each
-    heating_circuits = coordinator.get_heating_circuits()
-    constraints = coordinator.get_heat_constraints()
-
-    entities = []
-    for circuit in heating_circuits:
-        circuit_nr = int(circuit.get("nr", 0))
-        circuit_name = circuit.get("name", f"Circuit {circuit_nr}")
-
-        # Day temperature
-        entities.append(
-            GuntamaticTempNumber(
-                coordinator=coordinator,
-                circuit_nr=circuit_nr,
-                circuit_name=circuit_name,
-                temp_type="day",
-                constraints=constraints,
+    @callback
+    def _async_add_new() -> None:
+        circuits = coordinator.data.circuits
+        new = {nr for nr, circuit in circuits.items() if circuit.numbered} - known
+        known.update(new)
+        if new:
+            async_add_entities(
+                BiostarSetPoint(coordinator, nr, period)
+                for nr in sorted(new)
+                for period in PERIODS
             )
-        )
 
-        # Night temperature
-        entities.append(
-            GuntamaticTempNumber(
-                coordinator=coordinator,
-                circuit_nr=circuit_nr,
-                circuit_name=circuit_name,
-                temp_type="night",
-                constraints=constraints,
-            )
-        )
-
-    if entities:
-        async_add_entities(entities)
-        _LOGGER.info(f"Added {len(entities)} temperature control entities")
-    else:
-        _LOGGER.debug("No heating circuits found - No temperature entities created")
+    _async_add_new()
+    entry.async_on_unload(coordinator.async_add_listener(_async_add_new))
 
 
-class GuntamaticTempNumber(CoordinatorEntity, NumberEntity):
-    """Number entity for heating circuit temperature control."""
+class BiostarSetPoint(BiostarEntity, NumberEntity):
+    """Day or night room set point of a heating circuit (HKx04 / HKx05)."""
 
-    _attr_has_entity_name = True
+    _attr_device_class = NumberDeviceClass.TEMPERATURE
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
-    _attr_mode = NumberMode.SLIDER
-    _attr_icon = "mdi:thermometer"
+    _attr_mode = NumberMode.BOX
 
-    def __init__(
-        self,
-        coordinator: BiostarUpdateCoordinator,
-        circuit_nr: int,
-        circuit_name: str,
-        temp_type: str,
-        constraints: dict,
-    ) -> None:
-        """Initialize the number entity."""
-        super().__init__(coordinator)
-        self._circuit_nr = circuit_nr
-        self._circuit_name = circuit_name
-        self._temp_type = temp_type
+    def __init__(self, coordinator: BiostarCoordinator, nr: int, period: str) -> None:
+        """Initialize the number."""
+        # Same unique ID as 1.x.
+        super().__init__(coordinator, f"{nr}_{period}_temp")
+        self._nr = nr
+        self._period = period
+        self._attr_translation_key = f"{period}_temperature"
+        self._attr_translation_placeholders = {"index": str(nr)}
 
-        # Translation key will be 'day_temperature' or 'night_temperature'
-        self._attr_translation_key = f"{temp_type}_temperature"
-
-        # Unique ID
-        self._attr_unique_id = f"{config_entry_unique_id(coordinator.config_entry)}_{circuit_nr}_{temp_type}_temp"
-
-        # Temperature constraints from API
-        self._attr_native_min_value = constraints.get("min", 15.0)
-        self._attr_native_max_value = constraints.get("max", 30.0)
-        self._attr_native_step = constraints.get("inc", 0.5)
+    def _constraint(self, name: str) -> float:
+        return self.coordinator.data.constraints.get(name, DEFAULT_CONSTRAINTS[name])
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return device_info_for_entry(
-            self.coordinator.config_entry,
-            self.coordinator.get_device_info(),
-        )
+    def native_min_value(self) -> float:
+        """Return the lowest accepted set point."""
+        return self._constraint("min")
+
+    @property
+    def native_max_value(self) -> float:
+        """Return the highest accepted set point."""
+        return self._constraint("max")
+
+    @property
+    def native_step(self) -> float:
+        """Return the set point increment."""
+        return self._constraint("inc")
 
     @property
     def native_value(self) -> float | None:
-        """Return the current temperature value."""
-        heating_circuits = self.coordinator.get_heating_circuits()
+        """Return the current set point."""
+        circuit = self.coordinator.data.circuits.get(self._nr)
+        if circuit is None:
+            return None
+        return circuit.day_temp if self._period == "day" else circuit.night_temp
 
-        for circuit in heating_circuits:
-            if int(circuit.get("nr", 0)) == self._circuit_nr:
-                if self._temp_type == "day":
-                    return circuit.get("day_temp")
-                else:
-                    return circuit.get("night_temp")
-
-        return None
+    @property
+    def available(self) -> bool:
+        """Unavailable when the circuit disappears from status.cgi."""
+        return super().available and self._nr in self.coordinator.data.circuits
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the temperature value."""
-        _LOGGER.info(
-            f"Setting {self._temp_type} temperature to {value}°C for {self._circuit_name}"
-        )
+        """Write the set point, rounded to the step the boiler accepts."""
+        step = self.native_step
+        if step > 0:
+            value = round(round(value / step) * step, 2)
+        nr, period = self._nr, self._period
 
-        success = await self.coordinator.async_set_temperature(
-            self._circuit_nr, self._temp_type, value
-        )
+        def applied(data) -> bool:
+            circuit = data.circuits.get(nr)
+            if circuit is None:
+                return False
+            current = circuit.day_temp if period == "day" else circuit.night_temp
+            return current is not None and abs(current - value) < 0.01
 
-        if not success:
-            _LOGGER.error(
-                f"Failed to set {self._temp_type} temperature for {self._circuit_name}"
-            )
+        await self.coordinator.async_command(
+            self.coordinator.client.async_set_circuit_temperature(nr, period, value),
+            f"{period} set point {value} °C on heating circuit {nr}",
+            applied,
+        )

@@ -25,18 +25,31 @@
                 "name": "Programma riscaldamento",
                 "state": {
                     "off": "Spento",
-                    "normal": "Normale",
+                    "timer": "Normale",
+                    "dhw": "Acqua calda",
                     "heat": "Riscaldamento",
-                    "lower": "Ridotto"
+                    "hibernate": "Ridotto",
+                    "hibernate_to": "Ridotto fino a",
+                    "dhw_boost": "Carica acqua calda"
+                }
+            },
+            "circuit_program": {
+                "name": "Programma circuito {index}",
+                "state": {
+                    "off": "Spento",
+                    "timer": "Normale",
+                    "heat": "Riscaldamento",
+                    "hibernate": "Ridotto",
+                    "hibernate_to": "Ridotto fino a"
                 }
             }
         },
         "number": {
             "day_temperature": {
-                "name": "Temperatura giorno"
+                "name": "Temperatura giorno circuito {index}"
             },
             "night_temperature": {
-                "name": "Temperatura notte"
+                "name": "Temperatura notte circuito {index}"
             }
         }
     }

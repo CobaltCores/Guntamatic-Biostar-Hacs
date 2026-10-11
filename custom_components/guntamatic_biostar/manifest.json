@@ -1,13 +1,17 @@
 {
   "domain": "guntamatic_biostar",
   "name": "Guntamatic Biostar",
-  "codeowners": ["@CobaltCores"],
+  "codeowners": [
+    "@CobaltCores"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/CobaltCores/Guntamatic-Biostar-Hacs",
   "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/CobaltCores/Guntamatic-Biostar-Hacs/issues",
-  "requirements": [],
-  "version": "1.2.0"
+  "requirements": [
+    "guntamatic>=1.12.0,<2"
+  ],
+  "version": "2.0.0"
 }

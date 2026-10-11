@@ -36,18 +36,206 @@
                 "name": "Programme de chauffage",
                 "state": {
                     "off": "Arrêt",
-                    "normal": "Normal",
+                    "timer": "Normal (horloge)",
+                    "dhw": "Eau chaude seule",
                     "heat": "Chauffage",
-                    "lower": "Réduit"
+                    "hibernate": "Réduit",
+                    "hibernate_to": "Réduit jusqu'à",
+                    "dhw_boost": "Recharge ECS"
+                }
+            },
+            "circuit_program": {
+                "name": "Programme circuit {index}",
+                "state": {
+                    "off": "Arrêt",
+                    "timer": "Normal (horloge)",
+                    "heat": "Chauffage",
+                    "hibernate": "Réduit",
+                    "hibernate_to": "Réduit jusqu'à"
                 }
             }
         },
         "number": {
             "day_temperature": {
-                "name": "Température jour"
+                "name": "Consigne jour circuit {index}"
             },
             "night_temperature": {
-                "name": "Température nuit"
+                "name": "Consigne nuit circuit {index}"
+            }
+        },
+        "binary_sensor": {
+            "fault": {
+                "name": "Défaut"
+            }
+        },
+        "sensor": {
+            "boiler_temperature": {
+                "name": "Température chaudière"
+            },
+            "outdoor_temperature": {
+                "name": "Température extérieure"
+            },
+            "buffer_load": {
+                "name": "Charge accumulateur"
+            },
+            "buffer_top_temperature": {
+                "name": "Température accumulateur haut"
+            },
+            "buffer_center_temperature": {
+                "name": "Température accumulateur milieu"
+            },
+            "buffer_bottom_temperature": {
+                "name": "Température accumulateur bas"
+            },
+            "buffer_top_n_temperature": {
+                "name": "Température accumulateur {index} haut"
+            },
+            "buffer_bottom_n_temperature": {
+                "name": "Température accumulateur {index} bas"
+            },
+            "buffer_tn_temperature": {
+                "name": "Température accumulateur T{index}"
+            },
+            "dhw_temperature": {
+                "name": "Température eau chaude {index}"
+            },
+            "extra_dhw_temperature": {
+                "name": "Température ECS supplémentaire {index}"
+            },
+            "extra_dhw_boost": {
+                "name": "Pompe ECS supplémentaire {index}",
+                "state": {
+                    "auto": "Auto",
+                    "off": "Arrêt",
+                    "nonstop": "Continu",
+                    "on": "Marche"
+                }
+            },
+            "dhw_pump": {
+                "name": "Pompe eau chaude {index}",
+                "state": {
+                    "on": "Marche",
+                    "off": "Arrêt"
+                }
+            },
+            "room_temperature": {
+                "name": "Température ambiante circuit {index}"
+            },
+            "flow_temperature": {
+                "name": "Température départ circuit {index}"
+            },
+            "circuit_pump": {
+                "name": "Pompe circuit {index}",
+                "state": {
+                    "auto": "Auto",
+                    "off": "Arrêt",
+                    "nonstop": "Continu",
+                    "on": "Marche"
+                }
+            },
+            "circuit_program": {
+                "name": "Programme circuit {index}",
+                "state": {
+                    "off": "Arrêt",
+                    "timer": "Normal (horloge)",
+                    "heat": "Chauffage",
+                    "hibernate": "Réduit",
+                    "hibernate_to": "Réduit jusqu'à"
+                }
+            },
+            "auxiliary_pump": {
+                "name": "Pompe réseau {index}",
+                "state": {
+                    "auto": "Auto",
+                    "off": "Arrêt",
+                    "nonstop": "Continu",
+                    "on": "Marche"
+                }
+            },
+            "circuit_day_target": {
+                "name": "Consigne jour circuit {index}"
+            },
+            "circuit_night_target": {
+                "name": "Consigne nuit circuit {index}"
+            },
+            "boiler_shunt_pump": {
+                "name": "Pompe de charge chaudière",
+                "state": {
+                    "on": "Marche",
+                    "off": "Arrêt"
+                }
+            },
+            "suction_fan": {
+                "name": "Ventilateur d'aspiration"
+            },
+            "primary_air": {
+                "name": "Air primaire"
+            },
+            "secondary_air": {
+                "name": "Air secondaire"
+            },
+            "discharge_motor": {
+                "name": "Moteur vis d'extraction"
+            },
+            "grate": {
+                "name": "Grille"
+            },
+            "g1_target": {
+                "name": "Consigne G1"
+            },
+            "output": {
+                "name": "Puissance"
+            },
+            "co2_content": {
+                "name": "Teneur en CO₂"
+            },
+            "flue_gas": {
+                "name": "Fumées"
+            },
+            "fuel_level": {
+                "name": "Niveau de combustible"
+            },
+            "program": {
+                "name": "Programme de chauffage",
+                "state": {
+                    "off": "Arrêt",
+                    "timer": "Normal (horloge)",
+                    "dhw": "Eau chaude seule",
+                    "heat": "Chauffage",
+                    "hibernate": "Réduit",
+                    "hibernate_to": "Réduit jusqu'à",
+                    "dhw_boost": "Recharge ECS"
+                }
+            },
+            "status": {
+                "name": "État"
+            },
+            "fault_message": {
+                "name": "Message de défaut {index}"
+            },
+            "operating_time": {
+                "name": "Heures de fonctionnement"
+            },
+            "service_hours": {
+                "name": "Compteur entretien"
+            },
+            "service_days": {
+                "name": "Compteur entretien (jours)"
+            },
+            "ash_empty_in": {
+                "name": "Vidage cendrier dans"
+            },
+            "cleaning_countdown": {
+                "name": "Nettoyage dans"
+            },
+            "serial": {
+                "name": "Numéro de série"
+            },
+            "version": {
+                "name": "Version firmware"
+            },
+            "last_update": {
+                "name": "Dernière mise à jour"
             }
         }
     }

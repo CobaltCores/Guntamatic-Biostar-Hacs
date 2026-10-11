@@ -33,21 +33,209 @@
     "entity": {
         "select": {
             "heating_program": {
-                "name": "Heating Program",
+                "name": "Heating program",
                 "state": {
                     "off": "Off",
-                    "normal": "Normal",
-                    "heat": "Heat",
-                    "lower": "Lower"
+                    "timer": "Normal (timer)",
+                    "dhw": "Hot water only",
+                    "heat": "Heating",
+                    "hibernate": "Reduced",
+                    "hibernate_to": "Reduced until",
+                    "dhw_boost": "Hot water boost"
+                }
+            },
+            "circuit_program": {
+                "name": "Program circuit {index}",
+                "state": {
+                    "off": "Off",
+                    "timer": "Normal (timer)",
+                    "heat": "Heating",
+                    "hibernate": "Reduced",
+                    "hibernate_to": "Reduced until"
                 }
             }
         },
         "number": {
             "day_temperature": {
-                "name": "Day Temperature"
+                "name": "Day set point circuit {index}"
             },
             "night_temperature": {
-                "name": "Night Temperature"
+                "name": "Night set point circuit {index}"
+            }
+        },
+        "binary_sensor": {
+            "fault": {
+                "name": "Fault"
+            }
+        },
+        "sensor": {
+            "boiler_temperature": {
+                "name": "Boiler temperature"
+            },
+            "outdoor_temperature": {
+                "name": "Outdoor temperature"
+            },
+            "buffer_load": {
+                "name": "Buffer load"
+            },
+            "buffer_top_temperature": {
+                "name": "Buffer top temperature"
+            },
+            "buffer_center_temperature": {
+                "name": "Buffer middle temperature"
+            },
+            "buffer_bottom_temperature": {
+                "name": "Buffer bottom temperature"
+            },
+            "buffer_top_n_temperature": {
+                "name": "Buffer {index} top temperature"
+            },
+            "buffer_bottom_n_temperature": {
+                "name": "Buffer {index} bottom temperature"
+            },
+            "buffer_tn_temperature": {
+                "name": "Buffer T{index} temperature"
+            },
+            "dhw_temperature": {
+                "name": "Hot water {index} temperature"
+            },
+            "extra_dhw_temperature": {
+                "name": "Extra hot water {index} temperature"
+            },
+            "extra_dhw_boost": {
+                "name": "Extra hot water {index} pump",
+                "state": {
+                    "auto": "Auto",
+                    "off": "Off",
+                    "nonstop": "Continuous",
+                    "on": "On"
+                }
+            },
+            "dhw_pump": {
+                "name": "Hot water {index} pump",
+                "state": {
+                    "on": "On",
+                    "off": "Off"
+                }
+            },
+            "room_temperature": {
+                "name": "Room temperature circuit {index}"
+            },
+            "flow_temperature": {
+                "name": "Flow temperature circuit {index}"
+            },
+            "circuit_pump": {
+                "name": "Pump circuit {index}",
+                "state": {
+                    "auto": "Auto",
+                    "off": "Off",
+                    "nonstop": "Continuous",
+                    "on": "On"
+                }
+            },
+            "circuit_program": {
+                "name": "Program circuit {index}",
+                "state": {
+                    "off": "Off",
+                    "timer": "Normal (timer)",
+                    "heat": "Heating",
+                    "hibernate": "Reduced",
+                    "hibernate_to": "Reduced until"
+                }
+            },
+            "auxiliary_pump": {
+                "name": "Auxiliary pump {index}",
+                "state": {
+                    "auto": "Auto",
+                    "off": "Off",
+                    "nonstop": "Continuous",
+                    "on": "On"
+                }
+            },
+            "circuit_day_target": {
+                "name": "Day set point circuit {index}"
+            },
+            "circuit_night_target": {
+                "name": "Night set point circuit {index}"
+            },
+            "boiler_shunt_pump": {
+                "name": "Boiler charging pump",
+                "state": {
+                    "on": "On",
+                    "off": "Off"
+                }
+            },
+            "suction_fan": {
+                "name": "Induced draught fan"
+            },
+            "primary_air": {
+                "name": "Primary air"
+            },
+            "secondary_air": {
+                "name": "Secondary air"
+            },
+            "discharge_motor": {
+                "name": "Discharge screw motor"
+            },
+            "grate": {
+                "name": "Grate"
+            },
+            "g1_target": {
+                "name": "G1 target"
+            },
+            "output": {
+                "name": "Output"
+            },
+            "co2_content": {
+                "name": "CO₂ content"
+            },
+            "flue_gas": {
+                "name": "Flue gas"
+            },
+            "fuel_level": {
+                "name": "Fuel level"
+            },
+            "program": {
+                "name": "Heating program",
+                "state": {
+                    "off": "Off",
+                    "timer": "Normal (timer)",
+                    "dhw": "Hot water only",
+                    "heat": "Heating",
+                    "hibernate": "Reduced",
+                    "hibernate_to": "Reduced until",
+                    "dhw_boost": "Hot water boost"
+                }
+            },
+            "status": {
+                "name": "Status"
+            },
+            "fault_message": {
+                "name": "Fault message {index}"
+            },
+            "operating_time": {
+                "name": "Operating time"
+            },
+            "service_hours": {
+                "name": "Service counter"
+            },
+            "service_days": {
+                "name": "Service counter (days)"
+            },
+            "ash_empty_in": {
+                "name": "Ash emptying in"
+            },
+            "cleaning_countdown": {
+                "name": "Cleaning in"
+            },
+            "serial": {
+                "name": "Serial number"
+            },
+            "version": {
+                "name": "Firmware version"
+            },
+            "last_update": {
+                "name": "Last update"
             }
         }
     }
