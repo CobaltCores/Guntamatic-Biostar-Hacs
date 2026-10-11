@@ -228,6 +228,27 @@ def test_library_warnings_are_not_repeated(caplog):
     assert caplog.text.count("Untranslated string detected for INCONNU") == 1
 
 
+def test_parse_legacy_fault_lines_numbered_from_zero():
+    """Firmware 3.x numbers fault lines from 0; the second one is not lost."""
+    values, extras = parse_legacy(
+        ["Série; ", "Defaut 0; ", "Defaut 1; "],
+        ["1", "F23 Sonde fumées", "F41 Allumage"],
+    )
+    assert values["interruption_1"] == ("F23 Sonde fumées", None)
+    assert values["interruption_2"] == ("F41 Allumage", None)
+    assert extras == {}
+
+
+def test_parse_legacy_fault_lines_numbered_from_one():
+    """Older firmware numbers them from 1, as the library expects."""
+    values, _extras = parse_legacy(
+        ["Série; ", "Defaut 1; ", "Defaut 2; "],
+        ["1", "F23 Sonde fumées", ""],
+    )
+    assert values["interruption_1"] == ("F23 Sonde fumées", None)
+    assert values["interruption_2"] == (None, None)
+
+
 async def test_real_biostar_fw33_capture(hass: HomeAssistant, aioclient_mock):
     """Capture of a Biostar 15 kW, firmware 3.3c, French UI (serials changed).
 
@@ -276,5 +297,8 @@ async def test_real_biostar_fw33_capture(hass: HomeAssistant, aioclient_mock):
         "circuit_1_temp",
     ):
         assert key not in data.values, key
+    # "Defaut 0" and "Defaut 1" are two fault lines.
+    assert data.values["interruption_1"] == (None, None)
+    assert data.values["interruption_2"] == (None, None)
     assert data.extras == {}
     assert data.errors == []
