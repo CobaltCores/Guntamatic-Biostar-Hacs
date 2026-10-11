@@ -25,18 +25,31 @@
                 "name": "Heizprogramm",
                 "state": {
                     "off": "Aus",
-                    "normal": "Normal",
+                    "timer": "Normal",
+                    "dhw": "Warmwasser",
                     "heat": "Heizen",
-                    "lower": "Absenken"
+                    "hibernate": "Absenken",
+                    "hibernate_to": "Absenken bis",
+                    "dhw_boost": "Warmwasser nachladen"
+                }
+            },
+            "circuit_program": {
+                "name": "Programm Heizkreis {index}",
+                "state": {
+                    "off": "Aus",
+                    "timer": "Normal",
+                    "heat": "Heizen",
+                    "hibernate": "Absenken",
+                    "hibernate_to": "Absenken bis"
                 }
             }
         },
         "number": {
             "day_temperature": {
-                "name": "Tagestemperatur"
+                "name": "Tagestemperatur Heizkreis {index}"
             },
             "night_temperature": {
-                "name": "Nachttemperatur"
+                "name": "Nachttemperatur Heizkreis {index}"
             }
         }
     }

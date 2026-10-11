@@ -1,142 +1,263 @@
-"""The GuntamaticBiostar component - Dynamic sensor creation based on API response."""
+"""Sensors for the Guntamatic Biostar integration."""
 
 from __future__ import annotations
 
-import logging
+import re
+from dataclasses import dataclass
+from typing import Any
 
+from guntamatic.heater import TRANSLATE
 from homeassistant.components.sensor import (
+    SensorDeviceClass,
     SensorEntity,
+    SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import (
+    PERCENTAGE,
+    EntityCategory,
+    UnitOfTemperature,
+    UnitOfTime,
+)
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo, EntityCategory
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
-from . import BiostarUpdateCoordinator
-from .const import (
-    DOMAIN,
-    get_sensor_metadata,
-    get_icon_for_key,
-    is_diagnostic_sensor,
-    should_exclude_key,
-)
-from .entity_helpers import device_info_for_entry, dynamic_entity_unique_id
+from .api import NUMERIC_UNITS
+from .coordinator import BiostarConfigEntry, BiostarCoordinator
+from .entity import BiostarEntity
 
-_LOGGER = logging.getLogger(__name__)
+PARALLEL_UPDATES = 0
+
+
+@dataclass(frozen=True, kw_only=True)
+class KeySpec:
+    """How to present one stable data key."""
+
+    translation_key: str
+    diagnostic: bool = False
+    enabled_default: bool = True
+    state_class: SensorStateClass | None = None
+
+
+DIAG = {"diagnostic": True}
+
+# (pattern, translation key, options). A pattern group, when present, is the
+# slot number and becomes the {index} placeholder of the translated name.
+KEY_SPECS: list[tuple[str, str, dict[str, Any]]] = [
+    (r"boiler_temperature", "boiler_temperature", {}),
+    (r"outdoor_temperature", "outdoor_temperature", {}),
+    (r"buffer_load", "buffer_load", {}),
+    (r"buffer_top_temperature", "buffer_top_temperature", {}),
+    (r"buffer_center_temperature", "buffer_center_temperature", {}),
+    (r"buffer_bottom_temperature", "buffer_bottom_temperature", {}),
+    (r"buffer_top_(\d+)_temperature", "buffer_top_n_temperature", {}),
+    (r"buffer_bottom_(\d+)_temperature", "buffer_bottom_n_temperature", {}),
+    (r"buffer_t(\d+)_temperature", "buffer_tn_temperature", {}),
+    (r"domestic_hot_water_(\d+)_temperature", "dhw_temperature", {}),
+    (r"extra_dhw_(\d+)_temperature", "extra_dhw_temperature", {}),
+    (r"extra_dhw_boost_(\d+)", "extra_dhw_boost", DIAG),
+    (r"dhw_pump_(\d+)", "dhw_pump", DIAG),
+    (r"room_(\d+)_temperature", "room_temperature", {}),
+    (r"circuit_(\d+)_temp", "flow_temperature", {}),
+    (r"heating_circulation_pump_(\d+)", "circuit_pump", DIAG),
+    (r"heating_circulation_program_(\d+)", "circuit_program", {}),
+    (r"auxiliary_pump_(\d+)", "auxiliary_pump", DIAG),
+    (r"heating_circuit_(\d+)_day_target", "circuit_day_target", {}),
+    (r"heating_circuit_(\d+)_night_target", "circuit_night_target", {}),
+    (r"boiler_shunt_pump", "boiler_shunt_pump", DIAG),
+    (r"suction_fan", "suction_fan", DIAG),
+    (r"primary_air", "primary_air", DIAG),
+    (r"secondary_air", "secondary_air", DIAG),
+    (r"discharge_motor", "discharge_motor", DIAG),
+    (r"grate", "grate", DIAG),
+    (r"g1_target", "g1_target", DIAG),
+    (r"output", "output", {}),
+    (r"co2_content", "co2_content", {}),
+    (r"flue_gas", "flue_gas", {}),
+    (r"fuel_level", "fuel_level", {}),
+    (r"program", "program", {}),
+    (r"status", "status", {}),
+    (r"interruption_(\d+)", "fault_message", DIAG),
+    (
+        r"operating_time",
+        "operating_time",
+        {"diagnostic": True, "state_class": SensorStateClass.TOTAL_INCREASING},
+    ),
+    (r"service_hours", "service_hours", DIAG),
+    (r"service_days", "service_days", {"diagnostic": True, "enabled_default": False}),
+    (r"ash_empty_in", "ash_empty_in", {}),
+    (r"cleaning_countdown", "cleaning_countdown", {}),
+    (r"serial", "serial", DIAG),
+    (r"version", "version", DIAG),
+    (r"last_update", "last_update", {"diagnostic": True, "enabled_default": False}),
+]
+_COMPILED = [
+    (re.compile(rf"^{pattern}$"), key, opts) for pattern, key, opts in KEY_SPECS
+]
+LIBRARY_KEYS = set(TRANSLATE.values())
+
+UNIT_METADATA: dict[str, tuple[SensorDeviceClass | None, str]] = {
+    "°C": (SensorDeviceClass.TEMPERATURE, UnitOfTemperature.CELSIUS),
+    "%": (None, PERCENTAGE),
+    "h": (SensorDeviceClass.DURATION, UnitOfTime.HOURS),
+    "d": (SensorDeviceClass.DURATION, UnitOfTime.DAYS),
+}
+
+
+def describe_key(key: str) -> tuple[KeySpec | None, dict[str, str]]:
+    """Return the presentation of a stable key and its name placeholders."""
+    for pattern, translation_key, opts in _COMPILED:
+        if match := pattern.match(key):
+            placeholders = {"index": match.group(1)} if match.groups() else {}
+            return KeySpec(translation_key=translation_key, **opts), placeholders
+    return None, {}
+
+
+def data_values(coordinator: BiostarCoordinator) -> dict[str, tuple[Any, str | None]]:
+    """Return the values exposed as sensors (controls excluded)."""
+    data = coordinator.data
+    values = dict(data.values)
+    if coordinator.client.has_write_access:
+        # With a write key the programs are select entities instead.
+        for key in list(values):
+            if key == "program" or key.startswith("heating_circulation_program_"):
+                del values[key]
+    else:
+        # With a write key these are number entities instead.
+        for nr, circuit in data.circuits.items():
+            if circuit.day_temp is not None:
+                values[f"heating_circuit_{nr}_day_target"] = (circuit.day_temp, "°C")
+            if circuit.night_temp is not None:
+                values[f"heating_circuit_{nr}_night_target"] = (
+                    circuit.night_temp,
+                    "°C",
+                )
+    return values
+
+
+def extra_unique_suffix(label: str, stable_keys: set[str]) -> str:
+    """Unique ID suffix for a label the guntamatic library does not know.
+
+    Same format as 1.x so these entities survive the upgrade.
+    """
+    suffix = slugify(label)
+    if suffix in stable_keys or suffix in LIBRARY_KEYS or describe_key(suffix)[0]:
+        return f"raw_{suffix}"
+    return suffix
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: BiostarConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up sensors dynamically based on API data."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
-    known_keys: set[str] = set()
+    """Create sensors for every value the boiler reports, as they appear."""
+    coordinator = entry.runtime_data
+    known: set[str] = set()
+    known_extras: set[str] = set()
 
     @callback
-    def async_add_new_entities() -> None:
-        """Add new sensors discovered from coordinator data."""
-        sensors = []
-        for key, value_data in coordinator.data.items():
-            if key in known_keys or should_exclude_key(key) or _is_boolean(value_data):
+    def _async_add_new() -> None:
+        entities: list[SensorEntity] = []
+        values = data_values(coordinator)
+        for key, (value, unit) in values.items():
+            if key in known:
                 continue
-
-            known_keys.add(key)
-            sensors.append(
-                GuntamaticDynamicSensor(
-                    coordinator=coordinator,
-                    sensor_key=key,
-                    sensor_unit=_get_unit(value_data),
+            known.add(key)
+            entities.append(BiostarSensor(coordinator, key, unit))
+        for label, (value, unit) in coordinator.data.extras.items():
+            if label in known_extras or isinstance(value, bool):
+                continue
+            known_extras.add(label)
+            entities.append(
+                BiostarExtraSensor(
+                    coordinator, label, unit, extra_unique_suffix(label, set(values))
                 )
             )
+        if entities:
+            async_add_entities(entities)
 
-        if sensors:
-            _LOGGER.debug("Created %s sensors from API data", len(sensors))
-            async_add_entities(sensors)
-
-    async_add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(async_add_new_entities))
+    _async_add_new()
+    entry.async_on_unload(coordinator.async_add_listener(_async_add_new))
 
 
-def _get_unit(value_data) -> str | None:
-    """Return the unit from an API value tuple/list."""
-    if isinstance(value_data, (list, tuple)) and len(value_data) > 1:
-        return value_data[1]
-    return None
+def _apply_unit(entity: SensorEntity, unit: str | None) -> None:
+    if unit in UNIT_METADATA:
+        device_class, native_unit = UNIT_METADATA[unit]
+        entity._attr_device_class = device_class
+        entity._attr_native_unit_of_measurement = native_unit
+        entity._attr_state_class = SensorStateClass.MEASUREMENT
+    elif unit in NUMERIC_UNITS:
+        # Values with these units are converted to numbers by the API client.
+        entity._attr_native_unit_of_measurement = unit
+        entity._attr_state_class = SensorStateClass.MEASUREMENT
 
 
-def _is_boolean(value_data) -> bool:
-    """Return true if an API value should be represented as a binary sensor."""
-    if isinstance(value_data, (list, tuple)) and value_data:
-        return isinstance(value_data[0], bool)
-    return isinstance(value_data, bool)
-
-
-class GuntamaticDynamicSensor(
-    CoordinatorEntity[BiostarUpdateCoordinator], SensorEntity
-):
-    """A dynamically created sensor based on API data."""
-
-    _attr_has_entity_name = True
+class BiostarSensor(BiostarEntity, SensorEntity):
+    """Sensor for one stable data key."""
 
     def __init__(
-        self,
-        coordinator: BiostarUpdateCoordinator,
-        sensor_key: str,
-        sensor_unit: str | None,
+        self, coordinator: BiostarCoordinator, key: str, unit: str | None
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator=coordinator)
+        super().__init__(coordinator, slugify(key))
+        self._key = key
+        _apply_unit(self, unit)
 
-        self._sensor_key = sensor_key
-        self._sensor_unit = sensor_unit
-
-        # Clean the key name (remove leading underscore from status.cgi keys)
-        display_name = sensor_key.lstrip("_")
-
-        self._attr_unique_id = dynamic_entity_unique_id(
-            coordinator.config_entry,
-            sensor_key,
-        )
-
-        # Set the name (will be combined with device name: "Guntamatic Biostar Température chaudière")
-        self._attr_name = display_name
-
-        # Set icon based on key patterns
-        self._attr_icon = get_icon_for_key(sensor_key)
-
-        # Set as diagnostic if applicable
-        if is_diagnostic_sensor(sensor_key):
+        spec, placeholders = describe_key(key)
+        if spec is None:
+            # A key added by a newer guntamatic library: still show it.
+            self._attr_name = key.replace("_", " ").capitalize()
+            return
+        self._attr_translation_key = spec.translation_key
+        self._attr_translation_placeholders = placeholders
+        if spec.diagnostic:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
-
-        # Set device class and unit based on the unit from API
-        mapping = get_sensor_metadata(sensor_key, sensor_unit)
-        if mapping:
-            self._attr_device_class = mapping["device_class"]
-            self._attr_native_unit_of_measurement = mapping["unit"]
-            self._attr_state_class = mapping["state_class"]
-        else:
-            # No unit or unknown unit - text sensor
-            self._attr_device_class = None
-            self._attr_native_unit_of_measurement = None
-            self._attr_state_class = None
+        self._attr_entity_registry_enabled_default = spec.enabled_default
+        if spec.state_class is not None and self._attr_native_unit_of_measurement:
+            self._attr_state_class = spec.state_class
 
     @property
     def native_value(self) -> StateType:
-        """Return the sensor value."""
-        sensor_data = self.coordinator.data.get(self._sensor_key)
-        if sensor_data is None:
-            return None
-
-        if isinstance(sensor_data, (list, tuple)) and len(sensor_data) > 0:
-            return sensor_data[0]
-        return sensor_data
+        """Return the current value."""
+        entry = data_values(self.coordinator).get(self._key)
+        return None if entry is None else entry[0]
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return the device information."""
-        return device_info_for_entry(
-            self.coordinator.config_entry,
-            self.coordinator.get_device_info(),
-        )
+    def available(self) -> bool:
+        """Unavailable when the boiler stops reporting this value."""
+        return super().available and self._key in data_values(self.coordinator)
+
+
+class BiostarExtraSensor(BiostarEntity, SensorEntity):
+    """Value with a label the guntamatic library cannot translate (yet).
+
+    The name follows the boiler language, so it is disabled by default.
+    """
+
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self,
+        coordinator: BiostarCoordinator,
+        label: str,
+        unit: str | None,
+        unique_suffix: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, unique_suffix)
+        self._label = label
+        self._attr_name = label
+        _apply_unit(self, unit)
+
+    @property
+    def native_value(self) -> StateType:
+        """Return the current value."""
+        entry = self.coordinator.data.extras.get(self._label)
+        return None if entry is None else entry[0]
+
+    @property
+    def available(self) -> bool:
+        """Unavailable when the boiler stops reporting this value."""
+        return super().available and self._label in self.coordinator.data.extras

@@ -25,18 +25,31 @@
                 "name": "Program ogrevanja",
                 "state": {
                     "off": "Izklop",
-                    "normal": "Normalno",
+                    "timer": "Normalno",
+                    "dhw": "Topla voda",
                     "heat": "Ogrevanje",
-                    "lower": "Znižano"
+                    "hibernate": "Znižano",
+                    "hibernate_to": "Znižano do",
+                    "dhw_boost": "Dogrevanje vode"
+                }
+            },
+            "circuit_program": {
+                "name": "Program kroga {index}",
+                "state": {
+                    "off": "Izklop",
+                    "timer": "Normalno",
+                    "heat": "Ogrevanje",
+                    "hibernate": "Znižano",
+                    "hibernate_to": "Znižano do"
                 }
             }
         },
         "number": {
             "day_temperature": {
-                "name": "Dnevna temperatura"
+                "name": "Dnevna temperatura kroga {index}"
             },
             "night_temperature": {
-                "name": "Nočna temperatura"
+                "name": "Nočna temperatura kroga {index}"
             }
         }
     }

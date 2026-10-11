@@ -25,18 +25,31 @@
                 "name": "Program ogrzewania",
                 "state": {
                     "off": "Wyłączone",
-                    "normal": "Normalny",
+                    "timer": "Normalny",
+                    "dhw": "Ciepła woda",
                     "heat": "Ogrzewanie",
-                    "lower": "Obniżony"
+                    "hibernate": "Obniżony",
+                    "hibernate_to": "Obniżony do",
+                    "dhw_boost": "Doładowanie CWU"
+                }
+            },
+            "circuit_program": {
+                "name": "Program obiegu {index}",
+                "state": {
+                    "off": "Wyłączone",
+                    "timer": "Normalny",
+                    "heat": "Ogrzewanie",
+                    "hibernate": "Obniżony",
+                    "hibernate_to": "Obniżony do"
                 }
             }
         },
         "number": {
             "day_temperature": {
-                "name": "Temperatura dzienna"
+                "name": "Temperatura dzienna obiegu {index}"
             },
             "night_temperature": {
-                "name": "Temperatura nocna"
+                "name": "Temperatura nocna obiegu {index}"
             }
         }
     }

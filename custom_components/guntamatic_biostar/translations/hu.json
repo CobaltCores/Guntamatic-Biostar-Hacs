@@ -25,18 +25,31 @@
                 "name": "Fűtési program",
                 "state": {
                     "off": "Ki",
-                    "normal": "Normál",
+                    "timer": "Normál",
+                    "dhw": "Melegvíz",
                     "heat": "Fűtés",
-                    "lower": "Csökkentett"
+                    "hibernate": "Csökkentett",
+                    "hibernate_to": "Csökkentett -ig",
+                    "dhw_boost": "HMV utántöltés"
+                }
+            },
+            "circuit_program": {
+                "name": "{index}. kör programja",
+                "state": {
+                    "off": "Ki",
+                    "timer": "Normál",
+                    "heat": "Fűtés",
+                    "hibernate": "Csökkentett",
+                    "hibernate_to": "Csökkentett -ig"
                 }
             }
         },
         "number": {
             "day_temperature": {
-                "name": "Nappali hőmérséklet"
+                "name": "{index}. kör nappali hőmérséklete"
             },
             "night_temperature": {
-                "name": "Éjszakai hőmérséklet"
+                "name": "{index}. kör éjszakai hőmérséklete"
             }
         }
     }

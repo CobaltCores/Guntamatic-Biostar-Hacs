@@ -1,0 +1,2 @@
+pytest-homeassistant-custom-component
+guntamatic==1.12.0

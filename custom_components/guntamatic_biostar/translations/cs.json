@@ -25,18 +25,31 @@
                 "name": "Topný program",
                 "state": {
                     "off": "Vypnuto",
-                    "normal": "Normální",
+                    "timer": "Normální",
+                    "dhw": "TUV",
                     "heat": "Topení",
-                    "lower": "Snížený"
+                    "hibernate": "Útlum",
+                    "hibernate_to": "Útlum do",
+                    "dhw_boost": "Dohřev TUV"
+                }
+            },
+            "circuit_program": {
+                "name": "Program okruhu {index}",
+                "state": {
+                    "off": "Vypnuto",
+                    "timer": "Normální",
+                    "heat": "Topení",
+                    "hibernate": "Útlum",
+                    "hibernate_to": "Útlum do"
                 }
             }
         },
         "number": {
             "day_temperature": {
-                "name": "Denní teplota"
+                "name": "Denní teplota okruhu {index}"
             },
             "night_temperature": {
-                "name": "Noční teplota"
+                "name": "Noční teplota okruhu {index}"
             }
         }
     }

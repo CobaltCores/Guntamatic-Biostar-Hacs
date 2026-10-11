@@ -47,4 +47,4 @@ jobs:
           gh release view "$TAG" >/dev/null 2>&1 && exit 0
           gh release create "$TAG" \
             --title "$TAG" \
-            --notes "Safer IDs, legacy option, dynamic sensors, tests."
+            --generate-notes

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.util import slugify
 
 from .const import (
@@ -30,7 +30,7 @@ def config_entry_unique_id(config_entry: ConfigEntry) -> str:
 
 
 def dynamic_entity_unique_id(config_entry: ConfigEntry, sensor_key: str) -> str:
-    """Return a stable unique ID for a dynamic sensor/binary sensor."""
+    """Return a stable unique ID for a data key."""
     return f"{config_entry_unique_id(config_entry)}_{slugify(sensor_key)}"
 
 
